@@ -1,4 +1,4 @@
-# Chaoucair Test
+# PokeApp Test
 
 Este proyecto corresponde a una prueba tecnica para la vacante de desarrollador. El proyecto cuenta esta divido en tres partes las cuales son backend y nube.
 El aplicativo en su parte de back esta construido utilizando una arquitectura limpia (Clean Architecture) y teniendo como base el patro DDD. El acceso a la información se realiza por medio del patron Respotirotio para generar mas escalabilidad al momento de implementar nuevas funcionalidad o modificar las entidades ya existentes.
