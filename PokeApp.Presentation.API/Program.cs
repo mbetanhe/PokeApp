@@ -110,7 +110,7 @@ namespace PokeApp.Presentation.API
             app.UseSwagger();
             app.UseSwaggerUI(options =>
             {
-                options.SwaggerEndpoint("/swagger/v1/swagger.json", "Poke API V1");
+                options.SwaggerEndpoint("v1/swagger.json", "Poke API V1");
             });
 
             app.UseHttpsRedirection();
