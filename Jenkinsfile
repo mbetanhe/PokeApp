@@ -5,21 +5,17 @@ pipeline {
     DOTNET       = 'C:\\Program Files\\dotnet\\dotnet.exe'
     CSPROJ_PATH  = 'PokeApp.Presentation.API\\PokeApp.Presentation.API.csproj'
 
-    // Publicación
+    // carpetas
     OUTPUT_PATH  = 'C:\\inetpub\\wwwroot\\General\\api_test_cicd'
-    STAGING_PATH = '${WORKSPACE}\\artifacts'
+    STAGING_REL  = 'artifacts'   // relativa al WORKSPACE
 
-    // IIS
+    // IIS y backups
     APP_POOL_NAME = 'api_test_cicd'
-
-    // Backups
-    BACKUP_ROOT = 'C:\\Users\\mbetanhe\\Documents\\Backups\\Produccion'
+    BACKUP_ROOT   = 'C:\\Users\\mbetanhe\\Documents\\Backups\\Produccion'
   }
 
   stages {
-    stage('Checkout') {
-      steps { checkout scm }
-    }
+    stage('Checkout') { steps { checkout scm } }
 
     stage('Sanity .NET') {
       steps {
@@ -40,26 +36,24 @@ pipeline {
       }
     }
 
-stage('Backup antes de publicar') {
-  steps {
-    powershell '''
-      $ts   = Get-Date -Format "yyyy-MM-dd_HH-mm-ss"
-      $dest = Join-Path $env:BACKUP_ROOT $ts
-      New-Item -ItemType Directory -Force -Path $dest | Out-Null
+    stage('Backup antes de publicar') {
+      steps {
+        powershell '''
+          $ts   = Get-Date -Format "yyyy-MM-dd_HH-mm-ss"
+          $dest = Join-Path $env:BACKUP_ROOT $ts
+          New-Item -ItemType Directory -Force -Path $dest | Out-Null
 
-      if (Test-Path $env:OUTPUT_PATH) {
-        Write-Output "Copiando backup a $dest"
-        robocopy $env:OUTPUT_PATH $dest * /MIR /R:1 /W:1 /NFL /NDL /NJH /NJS
-        $code = $LASTEXITCODE
-        # 0 = no copy; 1 = files copied; 2 = extra files; 3 = 1+2 … todos son éxito.
-        if ($code -le 3) { exit 0 } else { Write-Error "RoboCopy failed with exit code $code"; exit $code }
-      } else {
-        Write-Output "OUTPUT_PATH no existe: $env:OUTPUT_PATH"
+          if (Test-Path $env:OUTPUT_PATH) {
+            Write-Output "Copiando backup a $dest"
+            robocopy $env:OUTPUT_PATH $dest * /MIR /R:1 /W:1 /NFL /NDL /NJH /NJS
+            $code = $LASTEXITCODE
+            if ($code -le 3) { exit 0 } else { Write-Error "RoboCopy failed with exit code $code"; exit $code }
+          } else {
+            Write-Output "OUTPUT_PATH no existe: $env:OUTPUT_PATH"
+          }
+        '''
       }
-    '''
-  }
-}
-
+    }
 
     stage('Restore') {
       steps {
@@ -75,13 +69,12 @@ stage('Backup antes de publicar') {
 
     stage('Publish (framework-dependent)') {
       steps {
-        // Sin --runtime y sin --self-contained
         bat """
-          if not exist "%STAGING_PATH%" mkdir "%STAGING_PATH%"
+          if not exist "%WORKSPACE%\\%STAGING_REL%" mkdir "%WORKSPACE%\\%STAGING_REL%"
           "%DOTNET%" publish "%CSPROJ_PATH%" ^
             -c Release ^
             -f net8.0 ^
-            -o "%STAGING_PATH%" ^
+            -o "%WORKSPACE%\\%STAGING_REL%" ^
             /p:PublishTrimmed=false ^
             --no-build
         """
@@ -91,9 +84,13 @@ stage('Backup antes de publicar') {
     stage('Deploy a IIS') {
       steps {
         powershell '''
-          if (!(Test-Path $env:OUTPUT_PATH)) { New-Item -ItemType Directory -Force -Path $env:OUTPUT_PATH | Out-Null }
-          Write-Output "Sincronizando a $env:OUTPUT_PATH"
-          robocopy $env:STAGING_PATH $env:OUTPUT_PATH * /MIR /R:1 /W:1 | Out-Null
+          $src = Join-Path $env:WORKSPACE $env:STAGING_REL
+          $dst = $env:OUTPUT_PATH
+          if (!(Test-Path $dst)) { New-Item -ItemType Directory -Force -Path $dst | Out-Null }
+          Write-Output "Sincronizando de $src a $dst"
+          robocopy $src $dst * /MIR /R:1 /W:1 /NFL /NDL /NJH /NJS
+          $code = $LASTEXITCODE
+          if ($code -le 3) { exit 0 } else { Write-Error "RoboCopy failed with exit code $code"; exit $code }
         '''
       }
     }
