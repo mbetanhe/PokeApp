@@ -2,32 +2,31 @@ pipeline {
   agent any
 
   environment {
-    // Fuerza el host x64 (evita depender del PATH del servicio)
-    DOTNET      = 'C:\\Program Files\\dotnet\\dotnet.exe'
+    DOTNET       = 'C:\\Program Files\\dotnet\\dotnet.exe'
+    CSPROJ_PATH  = 'PokeApp.Presentation.API\\PokeApp.Presentation.API.csproj'
 
-    // RUTA CORRECTA: tu repo no tiene 'src\\'
-    CSPROJ_PATH = 'PokeApp.Presentation.API\\PokeApp.Presentation.API.csproj'
+    // Publicación
+    OUTPUT_PATH  = 'C:\\inetpub\\wwwroot\\General\\api_test_cicd'
+    STAGING_PATH = '${WORKSPACE}\\artifacts'
 
-    OUTPUT_PATH = 'C:\\inetpub\\wwwroot\\General\\api_test_cicd'
-    BACKUP_ROOT = 'C:\\Users\\mbetanhe\\Documents\\Backups\\Produccion'
+    // IIS
     APP_POOL_NAME = 'api_test_cicd'
+
+    // Backups
+    BACKUP_ROOT = 'C:\\Users\\mbetanhe\\Documents\\Backups\\Produccion'
   }
 
   stages {
-
     stage('Checkout') {
-      steps {
-        checkout scm
-      }
+      steps { checkout scm }
     }
 
     stage('Sanity .NET') {
       steps {
         bat 'where dotnet'
-        bat "\"%DOTNET%\" --info"
-        bat "\"%DOTNET%\" --list-sdks"
-        // Confirma que el .csproj existe
-        bat "dir \"%WORKSPACE%\\PokeApp.Presentation.API\""
+        bat '"%DOTNET%" --info'
+        bat '"%DOTNET%" --list-sdks'
+        bat 'dir "%WORKSPACE%\\PokeApp.Presentation.API"'
       }
     }
 
@@ -44,12 +43,12 @@ pipeline {
     stage('Backup antes de publicar') {
       steps {
         powershell '''
-          $timestamp = Get-Date -Format "yyyy-MM-dd_HH-mm-ss"
-          $backupPath = Join-Path $env:BACKUP_ROOT $timestamp
-          Write-Output "Creando backup en: $backupPath"
-          New-Item -ItemType Directory -Path $backupPath -Force | Out-Null
+          $ts = Get-Date -Format "yyyy-MM-dd_HH-mm-ss"
+          $dest = Join-Path $env:BACKUP_ROOT $ts
+          New-Item -ItemType Directory -Force -Path $dest | Out-Null
           if (Test-Path $env:OUTPUT_PATH) {
-            Copy-Item -Path (Join-Path $env:OUTPUT_PATH '*') -Destination $backupPath -Recurse -Force
+            Write-Output "Copiando backup a $dest"
+            robocopy $env:OUTPUT_PATH $dest * /MIR /R:1 /W:1 | Out-Null
           } else {
             Write-Output "OUTPUT_PATH no existe: $env:OUTPUT_PATH"
           }
@@ -57,31 +56,40 @@ pipeline {
       }
     }
 
-    stage('Restaurar') {
+    stage('Restore') {
       steps {
-        bat "\"%DOTNET%\" restore \"${env.CSPROJ_PATH}\""
+        bat '"%DOTNET%" restore "%CSPROJ_PATH%"'
       }
     }
 
-    stage('Compilar') {
+    stage('Build') {
       steps {
-        bat "\"%DOTNET%\" build \"${env.CSPROJ_PATH}\" --configuration Release --no-restore"
+        bat '"%DOTNET%" build "%CSPROJ_PATH%" -c Release --no-restore'
       }
     }
 
-    stage('Publicar') {
+    stage('Publish (framework-dependent)') {
       steps {
-        // Publica directo al sitio (ya detuviste el App Pool). Si prefieres, publica a una carpeta temp y luego copia.
+        // Sin --runtime y sin --self-contained
         bat """
-          \"%DOTNET%\" publish \"${env.CSPROJ_PATH}\" ^
-            --configuration Release ^
-            --framework net8.0 ^
-            --runtime win-x64 ^
-            --self-contained true ^
-            --output \"${env.OUTPUT_PATH}\" ^
+          if not exist "%STAGING_PATH%" mkdir "%STAGING_PATH%"
+          "%DOTNET%" publish "%CSPROJ_PATH%" ^
+            -c Release ^
+            -f net8.0 ^
+            -o "%STAGING_PATH%" ^
             /p:PublishTrimmed=false ^
             --no-build
         """
+      }
+    }
+
+    stage('Deploy a IIS') {
+      steps {
+        powershell '''
+          if (!(Test-Path $env:OUTPUT_PATH)) { New-Item -ItemType Directory -Force -Path $env:OUTPUT_PATH | Out-Null }
+          Write-Output "Sincronizando a $env:OUTPUT_PATH"
+          robocopy $env:STAGING_PATH $env:OUTPUT_PATH * /MIR /R:1 /W:1 | Out-Null
+        '''
       }
     }
 
@@ -97,11 +105,7 @@ pipeline {
   }
 
   post {
-    failure {
-      echo 'El despliegue falló. Verifica los logs (especialmente Sanity .NET).'
-    }
-    success {
-      echo 'Despliegue completado exitosamente.'
-    }
+    success { echo 'Despliegue completado exitosamente.' }
+    failure { echo 'El despliegue falló. Revisa Sanity .NET y Publish.' }
   }
 }
