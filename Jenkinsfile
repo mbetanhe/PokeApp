@@ -3,7 +3,7 @@ pipeline {
 
     environment {
         PROJECT_PATH = 'src\\PokeApp.Presentation.API'  // Ruta del workspace
-        CSPROJ_PATH = 'src\\PokeApp.Presentation.API\\MiWebApp.csproj'
+        CSPROJ_PATH = 'src\\PokeApp.Presentation.API\\PokeApp.Presentation.API.csproj'
         OUTPUT_PATH = 'C:\\inetpub\\wwwroot\\General\\api_test_cicd'
         BACKUP_ROOT = 'C:\\Users\\mbetanhe\\Documents\\Backups\\Produccion'
         APP_POOL_NAME = 'api_test_cicd'
