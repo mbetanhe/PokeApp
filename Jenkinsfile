@@ -40,21 +40,26 @@ pipeline {
       }
     }
 
-    stage('Backup antes de publicar') {
-      steps {
-        powershell '''
-          $ts = Get-Date -Format "yyyy-MM-dd_HH-mm-ss"
-          $dest = Join-Path $env:BACKUP_ROOT $ts
-          New-Item -ItemType Directory -Force -Path $dest | Out-Null
-          if (Test-Path $env:OUTPUT_PATH) {
-            Write-Output "Copiando backup a $dest"
-            robocopy $env:OUTPUT_PATH $dest * /MIR /R:1 /W:1 | Out-Null
-          } else {
-            Write-Output "OUTPUT_PATH no existe: $env:OUTPUT_PATH"
-          }
-        '''
+stage('Backup antes de publicar') {
+  steps {
+    powershell '''
+      $ts   = Get-Date -Format "yyyy-MM-dd_HH-mm-ss"
+      $dest = Join-Path $env:BACKUP_ROOT $ts
+      New-Item -ItemType Directory -Force -Path $dest | Out-Null
+
+      if (Test-Path $env:OUTPUT_PATH) {
+        Write-Output "Copiando backup a $dest"
+        robocopy $env:OUTPUT_PATH $dest * /MIR /R:1 /W:1 /NFL /NDL /NJH /NJS
+        $code = $LASTEXITCODE
+        # 0 = no copy; 1 = files copied; 2 = extra files; 3 = 1+2 … todos son éxito.
+        if ($code -le 3) { exit 0 } else { Write-Error "RoboCopy failed with exit code $code"; exit $code }
+      } else {
+        Write-Output "OUTPUT_PATH no existe: $env:OUTPUT_PATH"
       }
-    }
+    '''
+  }
+}
+
 
     stage('Restore') {
       steps {
