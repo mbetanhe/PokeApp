@@ -36,20 +36,20 @@ pipeline {
 
         stage('Restaurar') {
             steps {
-                bat "dotnet restore \"$env:CSPROJ_PATH\""
+                bat "dotnet restore \"${env.CSPROJ_PATH}\""
             }
         }
 
         stage('Compilar') {
             steps {
-                bat "dotnet build \"$env:CSPROJ_PATH\" --configuration Release"
+                bat "dotnet build \"${env.CSPROJ_PATH}\" --configuration Release"
             }
         }
 
         stage('Publicar') {
             steps {
                 bat """
-                    dotnet publish \"$env:CSPROJ_PATH\" ^
+                    dotnet publish \"${env.CSPROJ_PATH}\" ^
                         --configuration Release ^
                         --framework net8.0 ^
                         --runtime win-x64 ^
