@@ -2,8 +2,8 @@ pipeline {
     agent any
 
     environment {
-        PROJECT_PATH = 'C:\\Jenkins\\workspace\\PokeApp\PokeApp.Presentation.API'  // Ruta del workspace
-        CSPROJ_PATH = 'C:\\Jenkins\\workspace\\PokeApp\PokeApp.Presentation.API\\MiWebApp.csproj'
+        PROJECT_PATH = 'C:\\Jenkins\\workspace\\PokeApp\\PokeApp.Presentation.API'  // Ruta del workspace
+        CSPROJ_PATH = 'C:\\Jenkins\\workspace\\PokeApp\\PokeApp.Presentation.API\\MiWebApp.csproj'
         OUTPUT_PATH = 'C:\\inetpub\\wwwroot\\General\\api_test_cicd'
         BACKUP_ROOT = 'C:\\Users\\mbetanhe\\Documents\\Backups\\Produccion'
         APP_POOL_NAME = 'api_test_cicd'
